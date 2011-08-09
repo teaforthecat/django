@@ -224,7 +224,9 @@ class BaseDatabaseCreation(object):
         self._create_test_db(verbosity, autoclobber)
 
         self.connection.close()
+        self.connection.settings_dict["ORIGINAL_NAME"] = self.connection.settings_dict["NAME"]
         self.connection.settings_dict["NAME"] = test_database_name
+
 
         # Confirm the feature set of the test database
         self.connection.features.confirm()
@@ -329,6 +331,13 @@ class BaseDatabaseCreation(object):
         Destroy a test database, prompting the user for confirmation if the
         database already exists. Returns the name of the test database created.
         """
+
+
+        #  _destroy_test_db is not working as advertised
+        old_database_name = self.connection.settings_dict['ORIGINAL_NAME']
+
+
+
         self.connection.close()
         test_database_name = self.connection.settings_dict['NAME']
         if verbosity >= 1:
