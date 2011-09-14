@@ -1297,7 +1297,7 @@ class InlineModelAdmin(BaseModelAdmin):
 
     def _media(self):
         from django.conf import settings
-        js = ['js/jquery.min.js', 'js/jquery.init.js', 'js/inlines.min.js']
+        js = ['js/jquery.min.js', 'js/jquery.init.js', 'js/inlines.js']
         if self.prepopulated_fields:
             js.append('js/urlify.js')
             js.append('js/prepopulate.min.js')
