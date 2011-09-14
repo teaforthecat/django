@@ -122,7 +122,7 @@
 			});
 		}
 		return this;
-	}
+	};
 	/* Setup plugin defaults */
 	$.fn.formset.defaults = {
 		prefix: "form",					// The form prefix for your django formset
@@ -134,5 +134,5 @@
 		formCssClass: "dynamic-form",	// CSS class applied to each form in a formset
 		added: null,					// Function called each time a new form is added
 		removed: null					// Function called each time a form is deleted
-	}
+	};
 })(django.jQuery);
