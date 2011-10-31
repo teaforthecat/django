@@ -66,6 +66,12 @@ def patch_cache_control(response, **kwargs):
     if 'max-age' in cc and 'max_age' in kwargs:
         kwargs['max_age'] = min(cc['max-age'], kwargs['max_age'])
 
+    # Allow overriding private caching and vice versa
+    if 'private' in cc and 'public' in kwargs:
+        del cc['private']
+    elif 'public' in cc and 'private' in kwargs:
+        del cc['public']
+
     for (k, v) in kwargs.items():
         cc[k.replace('_', '-')] = v
     cc = ', '.join([dictvalue(el) for el in cc.items()])
@@ -86,6 +92,10 @@ def get_max_age(response):
         except (ValueError, TypeError):
             pass
 
+def _set_response_etag(response):
+    response['ETag'] = '"%s"' % hashlib.md5(response.content).hexdigest()
+    return response
+
 def patch_response_headers(response, cache_timeout=None):
     """
     Adds some useful headers to the given HttpResponse object:
@@ -101,7 +111,10 @@ def patch_response_headers(response, cache_timeout=None):
     if cache_timeout < 0:
         cache_timeout = 0 # Can't have max-age negative
     if settings.USE_ETAGS and not response.has_header('ETag'):
-        response['ETag'] = '"%s"' % hashlib.md5(response.content).hexdigest()
+        if hasattr(response, 'render') and callable(response.render):
+            response.add_post_render_callback(_set_response_etag)
+        else:
+            response = _set_response_etag(response)
     if not response.has_header('Last-Modified'):
         response['Last-Modified'] = http_date()
     if not response.has_header('Expires'):
@@ -161,7 +174,7 @@ def _generate_cache_key(request, method, headerlist, key_prefix):
             ctx.update(value)
     path = hashlib.md5(iri_to_uri(request.get_full_path()))
     cache_key = 'views.decorators.cache.cache_page.%s.%s.%s.%s' % (
-        key_prefix, request.method, path.hexdigest(), ctx.hexdigest())
+        key_prefix, method, path.hexdigest(), ctx.hexdigest())
     return _i18n_cache_key_suffix(request, cache_key)
 
 def _generate_cache_header_key(key_prefix, request):

@@ -1,8 +1,12 @@
+from __future__ import absolute_import
+
 from datetime import datetime
 from operator import attrgetter
+
 from django.core.exceptions import FieldError
 from django.test import TestCase, skipUnlessDBFeature
-from models import Author, Article, Tag
+
+from .models import Author, Article, Tag
 
 
 class LookupTests(TestCase):
@@ -243,7 +247,7 @@ class LookupTests(TestCase):
         self.assertQuerysetEqual(Article.objects.filter(id=self.a5.id).values(),
             [{
                 'id': self.a5.id,
-                'author_id': self.au2.id, 
+                'author_id': self.au2.id,
                 'headline': 'Article 5',
                 'pub_date': datetime(2005, 8, 1, 9, 0)
             }], transform=identity)
@@ -251,7 +255,7 @@ class LookupTests(TestCase):
     def test_values_list(self):
         # values_list() is similar to values(), except that the results are
         # returned as a list of tuples, rather than a list of dictionaries.
-        # Within each tuple, the order of the elemnts is the same as the order
+        # Within each tuple, the order of the elements is the same as the order
         # of fields in the values_list() call.
         identity = lambda x:x
         self.assertQuerysetEqual(Article.objects.values_list('headline'),

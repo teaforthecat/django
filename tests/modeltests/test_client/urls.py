@@ -1,6 +1,10 @@
-from django.conf.urls.defaults import *
+from __future__ import absolute_import
+
+from django.conf.urls import patterns
 from django.views.generic import RedirectView
-import views
+
+from . import views
+
 
 urlpatterns = patterns('',
     (r'^get_view/$', views.get_view),
@@ -21,6 +25,7 @@ urlpatterns = patterns('',
     (r'^login_protected_method_view/$', views.login_protected_method_view),
     (r'^login_protected_view_custom_redirect/$', views.login_protected_view_changed_redirect),
     (r'^permission_protected_view/$', views.permission_protected_view),
+    (r'^permission_protected_view_exception/$', views.permission_protected_view_exception),
     (r'^permission_protected_method_view/$', views.permission_protected_method_view),
     (r'^session_view/$', views.session_view),
     (r'^broken_view/$', views.broken_view),

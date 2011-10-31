@@ -1,16 +1,19 @@
+from __future__ import absolute_import
+
 from django.core.exceptions import ImproperlyConfigured
 from django.core.urlresolvers import reverse
 from django import forms
 from django.test import TestCase
 from django.utils.unittest import expectedFailure
 
-from regressiontests.generic_views.models import Artist, Author
-from regressiontests.generic_views import views
+from . import views
+from .models import Artist, Author
+
 
 class ModelFormMixinTests(TestCase):
     def test_get_form(self):
         form_class = views.AuthorGetQuerySetFormView().get_form_class()
-        self.assertEqual(form_class.Meta.model, Author)
+        self.assertEqual(form_class._meta.model, Author)
 
 class CreateViewTests(TestCase):
     urls = 'regressiontests.generic_views.urls'

@@ -301,7 +301,7 @@ SpatiaLite SQL equivalent::
 Oracle
 ~~~~~~
 
-Here the relation pattern is compreised at least one of the nine relation
+Here the relation pattern is comprised at least one of the nine relation
 strings: ``TOUCH``, ``OVERLAPBDYDISJOINT``, ``OVERLAPBDYINTERSECT``,
 ``EQUAL``, ``INSIDE``, ``COVEREDBY``, ``CONTAINS``, ``COVERS``, ``ON``, and
 ``ANYINTERACT``.   Multiple strings may be combined with the logical Boolean
@@ -982,7 +982,7 @@ __ http://geojson.org/
 
 .. method:: GeoQuerySet.gml(**kwargs)
 
-*Availability*: PostGIS, Oracle
+*Availability*: PostGIS, Oracle, SpatiaLite
 
 Attaches a ``gml`` attribute to every model in the queryset that contains the
 `Geographic Markup Language (GML)`__ representation of the geometry.
@@ -1013,7 +1013,7 @@ __ http://en.wikipedia.org/wiki/Geography_Markup_Language
 
 .. method:: GeoQuerySet.kml(**kwargs)
 
-*Availability*: PostGIS
+*Availability*: PostGIS, SpatiaLite
 
 Attaches a ``kml`` attribute to every model in the queryset that contains the
 `Keyhole Markup Language (KML)`__ representation of the geometry fields. It
@@ -1203,7 +1203,7 @@ Aggregate Functions
 Example::
 
     >>> from django.contrib.gis.db.models import Extent, Union
-    >>> WorldBorders.objects.aggregate(Extent('mpoly'), Union('mpoly'))
+    >>> WorldBorder.objects.aggregate(Extent('mpoly'), Union('mpoly'))
 
 ``Collect``
 ~~~~~~~~~~~

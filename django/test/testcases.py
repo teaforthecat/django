@@ -8,23 +8,28 @@ from xml.dom.minidom import parseString, Node
 
 from django.conf import settings
 from django.core import mail
+from django.core.exceptions import ValidationError
 from django.core.management import call_command
 from django.core.signals import request_started
 from django.core.urlresolvers import clear_url_caches
+from django.core.validators import EMPTY_VALUES
 from django.db import (transaction, connection, connections, DEFAULT_DB_ALIAS,
     reset_queries)
+from django.forms.fields import CharField
 from django.http import QueryDict
 from django.test import _doctest as doctest
 from django.test.client import Client
-from django.test.utils import get_warnings_state, restore_warnings_state, override_settings
+from django.test.utils import (get_warnings_state, restore_warnings_state,
+    override_settings)
 from django.utils import simplejson, unittest as ut2
 from django.utils.encoding import smart_str
 
 __all__ = ('DocTestRunner', 'OutputChecker', 'TestCase', 'TransactionTestCase',
-           'skipIfDBFeature', 'skipUnlessDBFeature')
+           'SimpleTestCase', 'skipIfDBFeature', 'skipUnlessDBFeature')
 
 normalize_long_ints = lambda s: re.sub(r'(?<![\w])(\d+)L(?![\w])', '\\1', s)
-normalize_decimals = lambda s: re.sub(r"Decimal\('(\d+(\.\d*)?)'\)", lambda m: "Decimal(\"%s\")" % m.groups()[0], s)
+normalize_decimals = lambda s: re.sub(r"Decimal\('(\d+(\.\d*)?)'\)",
+                                lambda m: "Decimal(\"%s\")" % m.groups()[0], s)
 
 def to_list(value):
     """
@@ -62,7 +67,9 @@ def restore_transaction_methods():
 
 class OutputChecker(doctest.OutputChecker):
     def check_output(self, want, got, optionflags):
-        "The entry method for doctest output checking. Defers to a sequence of child checkers"
+        """
+        The entry method for doctest output checking. Defers to a sequence of child checkers
+        """
         checks = (self.check_output_default,
                   self.check_output_numeric,
                   self.check_output_xml,
@@ -73,7 +80,10 @@ class OutputChecker(doctest.OutputChecker):
         return False
 
     def check_output_default(self, want, got, optionflags):
-        "The default comparator provided by doctest - not perfect, but good for most purposes"
+        """
+        The default comparator provided by doctest - not perfect, but good for
+        most purposes
+        """
         return doctest.OutputChecker.check_output(self, want, got, optionflags)
 
     def check_output_numeric(self, want, got, optionflags):
@@ -144,17 +154,19 @@ class OutputChecker(doctest.OutputChecker):
         try:
             want_root = parseString(want).firstChild
             got_root = parseString(got).firstChild
-        except:
+        except Exception:
             return False
         return check_element(want_root, got_root)
 
     def check_output_json(self, want, got, optionsflags):
-        "Tries to compare want and got as if they were JSON-encoded data"
+        """
+        Tries to compare want and got as if they were JSON-encoded data
+        """
         want, got = self._strip_quotes(want, got)
         try:
             want_json = simplejson.loads(want)
             got_json = simplejson.loads(got)
-        except:
+        except Exception:
             return False
         return want_json == got_json
 
@@ -235,8 +247,95 @@ class _AssertNumQueriesContext(object):
             )
         )
 
+class SimpleTestCase(ut2.TestCase):
 
-class TransactionTestCase(ut2.TestCase):
+    def save_warnings_state(self):
+        """
+        Saves the state of the warnings module
+        """
+        self._warnings_state = get_warnings_state()
+
+    def restore_warnings_state(self):
+        """
+        Restores the state of the warnings module to the state
+        saved by save_warnings_state()
+        """
+        restore_warnings_state(self._warnings_state)
+
+    def settings(self, **kwargs):
+        """
+        A context manager that temporarily sets a setting and reverts
+        back to the original value when exiting the context.
+        """
+        return override_settings(**kwargs)
+
+    def assertRaisesMessage(self, expected_exception, expected_message,
+                           callable_obj=None, *args, **kwargs):
+        """
+        Asserts that the message in a raised exception matches the passed
+        value.
+
+        Args:
+            expected_exception: Exception class expected to be raised.
+            expected_message: expected error message string value.
+            callable_obj: Function to be called.
+            args: Extra args.
+            kwargs: Extra kwargs.
+        """
+        return self.assertRaisesRegexp(expected_exception,
+                re.escape(expected_message), callable_obj, *args, **kwargs)
+
+    def assertFieldOutput(self, fieldclass, valid, invalid, field_args=None,
+            field_kwargs=None, empty_value=u''):
+        """
+        Asserts that a form field behaves correctly with various inputs.
+
+        Args:
+            fieldclass: the class of the field to be tested.
+            valid: a dictionary mapping valid inputs to their expected
+                    cleaned values.
+            invalid: a dictionary mapping invalid inputs to one or more
+                    raised error messages.
+            field_args: the args passed to instantiate the field
+            field_kwargs: the kwargs passed to instantiate the field
+            empty_value: the expected clean output for inputs in EMPTY_VALUES
+
+        """
+        if field_args is None:
+            field_args = []
+        if field_kwargs is None:
+            field_kwargs = {}
+        required = fieldclass(*field_args, **field_kwargs)
+        optional = fieldclass(*field_args,
+                              **dict(field_kwargs, required=False))
+        # test valid inputs
+        for input, output in valid.items():
+            self.assertEqual(required.clean(input), output)
+            self.assertEqual(optional.clean(input), output)
+        # test invalid inputs
+        for input, errors in invalid.items():
+            with self.assertRaises(ValidationError) as context_manager:
+                required.clean(input)
+            self.assertEqual(context_manager.exception.messages, errors)
+
+            with self.assertRaises(ValidationError) as context_manager:
+                optional.clean(input)
+            self.assertEqual(context_manager.exception.messages, errors)
+        # test required inputs
+        error_required = [u'This field is required.']
+        for e in EMPTY_VALUES:
+            with self.assertRaises(ValidationError) as context_manager:
+                required.clean(e)
+            self.assertEqual(context_manager.exception.messages,
+                             error_required)
+            self.assertEqual(optional.clean(e), empty_value)
+        # test that max_length and min_length are always accepted
+        if issubclass(fieldclass, CharField):
+            field_kwargs.update({'min_length':2, 'max_length':20})
+            self.assertTrue(isinstance(fieldclass(*field_args, **field_kwargs),
+                                       fieldclass))
+
+class TransactionTestCase(SimpleTestCase):
     # The class we'll use for the test client self.client.
     # Can be overridden in derived classes.
     client_class = Client
@@ -268,7 +367,8 @@ class TransactionTestCase(ut2.TestCase):
             if hasattr(self, 'fixtures'):
                 # We have to use this slightly awkward syntax due to the fact
                 # that we're using *args and **kwargs together.
-                call_command('loaddata', *self.fixtures, **{'verbosity': 0, 'database': db})
+                call_command('loaddata', *self.fixtures,
+                             **{'verbosity': 0, 'database': db})
 
     def _urlconf_setup(self):
         if hasattr(self, 'urls'):
@@ -321,8 +421,8 @@ class TransactionTestCase(ut2.TestCase):
         # be created with the wrong time).
         # To make sure this doesn't happen, get a clean connection at the
         # start of every test.
-        for connection in connections.all():
-            connection.close()
+        for conn in connections.all():
+            conn.close()
 
     def _fixture_teardown(self):
         pass
@@ -331,26 +431,6 @@ class TransactionTestCase(ut2.TestCase):
         if hasattr(self, '_old_root_urlconf'):
             settings.ROOT_URLCONF = self._old_root_urlconf
             clear_url_caches()
-
-    def save_warnings_state(self):
-        """
-        Saves the state of the warnings module
-        """
-        self._warnings_state = get_warnings_state()
-
-    def restore_warnings_state(self):
-        """
-        Restores the sate of the warnings module to the state
-        saved by save_warnings_state()
-        """
-        restore_warnings_state(self._warnings_state)
-
-    def settings(self, **kwargs):
-        """
-        A context manager that temporarily sets a setting and reverts
-        back to the original value when exiting the context.
-        """
-        return override_settings(**kwargs)
 
     def assertRedirects(self, response, expected_url, status_code=302,
                         target_status_code=200, host=None, msg_prefix=''):
@@ -401,7 +481,8 @@ class TransactionTestCase(ut2.TestCase):
                 " response code was %d (expected %d)" %
                     (path, redirect_response.status_code, target_status_code))
 
-        e_scheme, e_netloc, e_path, e_query, e_fragment = urlsplit(expected_url)
+        e_scheme, e_netloc, e_path, e_query, e_fragment = urlsplit(
+                                                              expected_url)
         if not (e_scheme or e_netloc):
             expected_url = urlunsplit(('http', host or 'testserver', e_path,
                 e_query, e_fragment))
@@ -419,6 +500,13 @@ class TransactionTestCase(ut2.TestCase):
         If ``count`` is None, the count doesn't matter - the assertion is true
         if the text occurs at least once in the response.
         """
+
+        # If the response supports deferred rendering and hasn't been rendered
+        # yet, then ensure that it does get rendered before proceeding further.
+        if (hasattr(response, 'render') and callable(response.render)
+            and not response.is_rendered):
+            response.render()
+
         if msg_prefix:
             msg_prefix += ": "
 
@@ -442,6 +530,13 @@ class TransactionTestCase(ut2.TestCase):
         successfully, (i.e., the HTTP status code was as expected), and that
         ``text`` doesn't occurs in the content of the response.
         """
+
+        # If the response supports deferred rendering and hasn't been rendered
+        # yet, then ensure that it does get rendered before proceeding further.
+        if (hasattr(response, 'render') and callable(response.render)
+            and not response.is_rendered):
+            response.render()
+
         if msg_prefix:
             msg_prefix += ": "
 
@@ -532,14 +627,16 @@ class TransactionTestCase(ut2.TestCase):
             msg_prefix + "Template '%s' was used unexpectedly in rendering"
             " the response" % template_name)
 
-    def assertQuerysetEqual(self, qs, values, transform=repr):
+    def assertQuerysetEqual(self, qs, values, transform=repr, ordered=True):
+        if not ordered:
+            return self.assertEqual(set(map(transform, qs)), set(values))
         return self.assertEqual(map(transform, qs), values)
 
     def assertNumQueries(self, num, func=None, *args, **kwargs):
         using = kwargs.pop("using", DEFAULT_DB_ALIAS)
-        connection = connections[using]
+        conn = connections[using]
 
-        context = _AssertNumQueriesContext(self, num, connection)
+        context = _AssertNumQueriesContext(self, num, conn)
         if func is None:
             return context
 
@@ -550,14 +647,16 @@ def connections_support_transactions():
     """
     Returns True if all connections support transactions.
     """
-    return all(conn.features.supports_transactions for conn in connections.all())
+    return all(conn.features.supports_transactions
+               for conn in connections.all())
 
 class TestCase(TransactionTestCase):
     """
     Does basically the same as TransactionTestCase, but surrounds every test
-    with a transaction, monkey-patches the real transaction management routines to
-    do nothing, and rollsback the test transaction at the end of the test. You have
-    to use TransactionTestCase, if you need transaction management inside a test.
+    with a transaction, monkey-patches the real transaction management routines
+    to do nothing, and rollsback the test transaction at the end of the test.
+    You have to use TransactionTestCase, if you need transaction management
+    inside a test.
     """
 
     def _fixture_setup(self):
@@ -581,11 +680,12 @@ class TestCase(TransactionTestCase):
 
         for db in databases:
             if hasattr(self, 'fixtures'):
-                call_command('loaddata', *self.fixtures, **{
-                                                            'verbosity': 0,
-                                                            'commit': False,
-                                                            'database': db
-                                                            })
+                call_command('loaddata', *self.fixtures,
+                             **{
+                                'verbosity': 0,
+                                'commit': False,
+                                'database': db
+                             })
 
     def _fixture_teardown(self):
         if not connections_support_transactions():
@@ -605,7 +705,8 @@ class TestCase(TransactionTestCase):
 
 def _deferredSkip(condition, reason):
     def decorator(test_func):
-        if not (isinstance(test_func, type) and issubclass(test_func, TestCase)):
+        if not (isinstance(test_func, type) and
+                issubclass(test_func, TestCase)):
             @wraps(test_func)
             def skip_wrapper(*args, **kwargs):
                 if condition():
@@ -619,11 +720,15 @@ def _deferredSkip(condition, reason):
     return decorator
 
 def skipIfDBFeature(feature):
-    "Skip a test if a database has the named feature"
+    """
+    Skip a test if a database has the named feature
+    """
     return _deferredSkip(lambda: getattr(connection.features, feature),
                          "Database has feature %s" % feature)
 
 def skipUnlessDBFeature(feature):
-    "Skip a test unless a database has the named feature"
+    """
+    Skip a test unless a database has the named feature
+    """
     return _deferredSkip(lambda: not getattr(connection.features, feature),
                          "Database doesn't support feature %s" % feature)

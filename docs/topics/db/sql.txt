@@ -124,8 +124,8 @@ Fields may also be left out::
     >>> people = Person.objects.raw('SELECT id, first_name FROM myapp_person')
 
 The ``Person`` objects returned by this query will be deferred model instances
-(see :meth:`~django.db.models.QuerySet.defer()`). This means that the fields
-that are omitted from the query will be loaded on demand. For example::
+(see :meth:`~django.db.models.query.QuerySet.defer()`). This means that the
+fields that are omitted from the query will be loaded on demand. For example::
 
     >>> for p in Person.objects.raw('SELECT id, first_name FROM myapp_person'):
     ...     print p.first_name, # This will be retrieved by the original query
@@ -240,6 +240,30 @@ alias::
     # Your code here...
     transaction.commit_unless_managed(using='my_db_alias')
 
+By default, the Python DB API will return results without their field
+names, which means you end up with a ``list`` of values, rather than a
+``dict``. At a small performance cost, you can return results as a
+``dict`` by using something like this::
+    
+    def dictfetchall(cursor):
+        "Returns all rows from a cursor as a dict"
+        desc = cursor.description
+        return [
+            dict(zip([col[0] for col in desc], row))
+            for row in cursor.fetchall()
+        ]
+
+Here is an example of the difference between the two::
+
+    >>> cursor.execute("SELECT id, parent_id from test LIMIT 2");
+    >>> cursor.fetchall()
+    ((54360982L, None), (54360880L, None))
+    
+    >>> cursor.execute("SELECT id, parent_id from test LIMIT 2");
+    >>> dictfetchall(cursor)
+    [{'parent_id': None, 'id': 54360982L}, {'parent_id': None, 'id': 54360880L}]
+
+
 .. _transactions-and-raw-sql:
 
 Transactions and raw SQL
@@ -259,14 +283,12 @@ as dirty using ``transaction.set_dirty()`` when using raw SQL calls.
 Connections and cursors
 -----------------------
 
-``connection`` and ``cursor`` mostly implement the standard `Python DB-API`_
-(except when it comes to :doc:`transaction handling </topics/db/transactions>`).
-If you're not familiar with the Python DB-API, note that the SQL statement in
-``cursor.execute()`` uses placeholders, ``"%s"``, rather than adding parameters
-directly within the SQL. If you use this technique, the underlying database
-library will automatically add quotes and escaping to your parameter(s) as
-necessary. (Also note that Django expects the ``"%s"`` placeholder, *not* the
-``"?"`` placeholder, which is used by the SQLite Python bindings. This is for
-the sake of consistency and sanity.)
-
-.. _Python DB-API: http://www.python.org/dev/peps/pep-0249/
+``connection`` and ``cursor`` mostly implement the standard Python DB-API
+described in :pep:`249` (except when it comes to :doc:`transaction handling
+</topics/db/transactions>`). If you're not familiar with the Python DB-API, note
+that the SQL statement in ``cursor.execute()`` uses placeholders, ``"%s"``,
+rather than adding parameters directly within the SQL. If you use this
+technique, the underlying database library will automatically add quotes and
+escaping to your parameter(s) as necessary. (Also note that Django expects the
+``"%s"`` placeholder, *not* the ``"?"`` placeholder, which is used by the SQLite
+Python bindings. This is for the sake of consistency and sanity.)

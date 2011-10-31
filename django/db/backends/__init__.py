@@ -9,7 +9,6 @@ from django.conf import settings
 from django.db import DEFAULT_DB_ALIAS
 from django.db.backends import util
 from django.db.transaction import TransactionManagementError
-from django.utils import datetime_safe
 from django.utils.importlib import import_module
 
 
@@ -301,8 +300,10 @@ class BaseDatabaseFeatures(object):
 
     can_use_chunked_reads = True
     can_return_id_from_insert = False
+    has_bulk_insert = False
     uses_autocommit = False
     uses_savepoints = False
+    can_combine_inserts_with_and_without_auto_increment_pk = False
 
     # If True, don't use integer foreign keys referring to, e.g., positive
     # integer primary keys.
@@ -363,6 +364,10 @@ class BaseDatabaseFeatures(object):
 
     # date_interval_sql can properly handle mixed Date/DateTime fields and timedeltas
     supports_mixed_date_datetime_comparisons = True
+
+    # Does the backend support tablespaces? Default to False because it isn't
+    # in the SQL standard.
+    supports_tablespaces = False
 
     # Features that need to be confirmed at runtime
     # Cache whether the confirmation has been performed.
@@ -695,8 +700,12 @@ class BaseDatabaseOperations(object):
 
     def tablespace_sql(self, tablespace, inline=False):
         """
-        Returns the SQL that will be appended to tables or rows to define
-        a tablespace. Returns '' if the backend doesn't use tablespaces.
+        Returns the SQL that will be used in a query to define the tablespace.
+
+        Returns '' if the backend doesn't support tablespaces.
+
+        If inline is True, the SQL is appended to a row; otherwise it's appended
+        to the entire CREATE TABLE or CREATE INDEX statement.
         """
         return ''
 
@@ -716,7 +725,7 @@ class BaseDatabaseOperations(object):
         """
         if value is None:
             return None
-        return datetime_safe.new_date(value).strftime('%Y-%m-%d')
+        return unicode(value)
 
     def value_to_db_datetime(self, value):
         """
@@ -729,7 +738,7 @@ class BaseDatabaseOperations(object):
 
     def value_to_db_time(self, value):
         """
-        Transform a datetime value to an object compatible with what is expected
+        Transform a time value to an object compatible with what is expected
         by the backend driver for time columns.
         """
         if value is None:
@@ -790,7 +799,7 @@ class BaseDatabaseOperations(object):
         This is used on specific backends to rule out known aggregates
         that are known to have faulty implementations. If the named
         aggregate function has a known problem, the backend should
-        raise NotImplemented.
+        raise NotImplementedError.
         """
         pass
 

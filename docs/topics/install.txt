@@ -48,23 +48,21 @@ documentation to determine which mode is right for your setup. Make
 sure you have Apache installed, with the mod_wsgi module activated.
 Django will work with any version of Apache that supports mod_wsgi.
 
-See :doc:`How to use Django with mod_wsgi </howto/deployment/modwsgi>`
+See :doc:`How to use Django with mod_wsgi </howto/deployment/wsgi/modwsgi>`
 for information on how to configure mod_wsgi once you have it
 installed.
 
-If you can't use mod_wsgi for some reason, fear not: Django supports
-many other deployment options. One is :doc:`uWSGI </howto/deployment/fastcgi>`;
-it works very well with `nginx`_. Another is :doc:`FastCGI
-</howto/deployment/fastcgi>`, perfect for using Django with servers
-other than Apache. Additionally, Django follows the WSGI_ spec, which
-allows it to run on a variety of server platforms. See the
-`server-arrangements wiki page`_ for specific installation
-instructions for each platform.
+If you can't use mod_wsgi for some reason, fear not: Django supports many other
+deployment options. One is :doc:`uWSGI </howto/deployment/fastcgi>`; it works
+very well with `nginx`_. Another is :doc:`FastCGI </howto/deployment/fastcgi>`,
+perfect for using Django with servers other than Apache. Additionally, Django
+follows the WSGI spec (:pep:`3333`), which allows it to run on a variety of
+server platforms. See the `server-arrangements wiki page`_ for specific
+installation instructions for each platform.
 
 .. _Apache: http://httpd.apache.org/
 .. _nginx: http://nginx.net/
 .. _mod_wsgi: http://code.google.com/p/modwsgi/
-.. _WSGI: http://www.python.org/dev/peps/pep-0333/
 .. _server-arrangements wiki page: http://code.djangoproject.com/wiki/ServerArrangements
 
 .. _database-installation:
@@ -170,6 +168,12 @@ This file should also be located in your ``site-packages`` directory.
     (Note that this should be run from a shell prompt, not a Python interactive
     prompt.)
 
+    Some Debian-based Linux distributions have separate ``site-packages``
+    directories for user-installed packages, such as when installing Django
+    from a downloaded tarball. The command  listed above will give you the
+    system's ``site-packages``, the user's directory can be found in
+    ``/usr/local/lib/`` instead of ``/usr/lib/``.
+
 .. _install-django-code:
 
 Install the Django code
@@ -194,19 +198,19 @@ of dependencies and easy upgrade paths.
 Installing an official release
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    1. Download the latest release from our `download page`_.
+1. Download the latest release from our `download page`_.
 
-    2. Untar the downloaded file (e.g. ``tar xzvf Django-NNN.tar.gz``,
-       where ``NNN`` is the version number of the latest release).
-       If you're using Windows, you can download the command-line tool
-       bsdtar_ to do this, or you can use a GUI-based tool such as 7-zip_.
+2. Untar the downloaded file (e.g. ``tar xzvf Django-NNN.tar.gz``,
+   where ``NNN`` is the version number of the latest release).
+   If you're using Windows, you can download the command-line tool
+   bsdtar_ to do this, or you can use a GUI-based tool such as 7-zip_.
 
-    3. Change into the directory created in step 2 (e.g. ``cd Django-NNN``).
+3. Change into the directory created in step 2 (e.g. ``cd Django-NNN``).
 
-    4. If you're using Linux, Mac OS X or some other flavor of Unix, enter
-       the command ``sudo python setup.py install`` at the shell prompt.
-       If you're using Windows, start up a command shell with administrator
-       privileges and run the command ``setup.py install``.
+4. If you're using Linux, Mac OS X or some other flavor of Unix, enter
+   the command ``sudo python setup.py install`` at the shell prompt.
+   If you're using Windows, start up a command shell with administrator
+   privileges and run the command ``setup.py install``.
 
 These commands will install Django in your Python installation's
 ``site-packages`` directory.

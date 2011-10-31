@@ -1,6 +1,10 @@
-from django.conf.urls.defaults import *
-from namespace_urls import URLObject
-from views import view_class_instance
+from __future__ import absolute_import
+
+from django.conf.urls import patterns, url, include
+
+from .namespace_urls import URLObject
+from .views import view_class_instance
+
 
 testobj3 = URLObject('testapp', 'test-ns3')
 

@@ -4,6 +4,7 @@ from django.core import signing
 from django.test import TestCase
 from django.utils.encoding import force_unicode
 
+
 class TestSigner(TestCase):
 
     def test_signature(self):
@@ -13,7 +14,7 @@ class TestSigner(TestCase):
         for s in (
             'hello',
             '3098247:529:087:',
-            u'\u2019'.encode('utf8'),
+            u'\u2019'.encode('utf-8'),
         ):
             self.assertEqual(
                 signer.signature(s),

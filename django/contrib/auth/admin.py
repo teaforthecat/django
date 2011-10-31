@@ -21,6 +21,15 @@ class GroupAdmin(admin.ModelAdmin):
     ordering = ('name',)
     filter_horizontal = ('permissions',)
 
+    def formfield_for_manytomany(self, db_field, request=None, **kwargs):
+        if db_field.name == 'permissions':
+            qs = kwargs.get('queryset', db_field.rel.to.objects)
+            # Avoid a major performance hit resolving permission names which
+            # triggers a content_type load:
+            kwargs['queryset'] = qs.select_related('content_type')
+        return super(GroupAdmin, self).formfield_for_manytomany(db_field, request=request, **kwargs)
+
+
 class UserAdmin(admin.ModelAdmin):
     add_form_template = 'admin/auth/user/add_form.html'
     change_user_password_template = None
@@ -46,15 +55,6 @@ class UserAdmin(admin.ModelAdmin):
     ordering = ('username',)
     filter_horizontal = ('user_permissions',)
 
-    def __call__(self, request, url):
-        # this should not be here, but must be due to the way __call__ routes
-        # in ModelAdmin.
-        if url is None:
-            return self.changelist_view(request)
-        if url.endswith('password'):
-            return self.user_change_password(request, url.split('/')[0])
-        return super(UserAdmin, self).__call__(request, url)
-
     def get_fieldsets(self, request, obj=None):
         if not obj:
             return self.add_fieldsets
@@ -74,7 +74,7 @@ class UserAdmin(admin.ModelAdmin):
         return super(UserAdmin, self).get_form(request, obj, **defaults)
 
     def get_urls(self):
-        from django.conf.urls.defaults import patterns
+        from django.conf.urls import patterns
         return patterns('',
             (r'^(\d+)/password/$', self.admin_site.admin_view(self.user_change_password))
         ) + super(UserAdmin, self).get_urls()

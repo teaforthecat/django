@@ -31,8 +31,8 @@ def create_permissions(app, created_models, verbosity, **kwargs):
     searched_perms = list()
     # The codenames and ctypes that should exist.
     ctypes = set()
-    for klass in app_models:
-        ctype = ContentType.objects.get_for_model(klass)
+    ctypes_for_models = ContentType.objects.get_for_models(*app_models)
+    for klass, ctype in ctypes_for_models.iteritems():
         ctypes.add(ctype)
         for perm in _get_all_permissions(klass._meta):
             searched_perms.append((ctype, perm))
@@ -46,17 +46,15 @@ def create_permissions(app, created_models, verbosity, **kwargs):
         "content_type", "codename"
     ))
 
-    for ctype, (codename, name) in searched_perms:
-        # If the permissions exists, move on.
-        if (ctype.pk, codename) in all_perms:
-            continue
-        p = auth_app.Permission.objects.create(
-            codename=codename,
-            name=name,
-            content_type=ctype
-        )
-        if verbosity >= 2:
-            print "Adding permission '%s'" % p
+    objs = [
+        auth_app.Permission(codename=codename, name=name, content_type=ctype)
+        for ctype, (codename, name) in searched_perms
+        if (ctype.pk, codename) not in all_perms
+    ]
+    auth_app.Permission.objects.bulk_create(objs)
+    if verbosity >= 2:
+        for obj in objs:
+            print "Adding permission '%s'" % obj
 
 
 def create_superuser(app, created_models, verbosity, **kwargs):
