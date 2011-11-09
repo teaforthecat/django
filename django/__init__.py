@@ -1,4 +1,6 @@
-VERSION = (1, 3, 0, 'final', 0)
+# VERSION = (1, 3, 0, 'final', 0)
+#needed to induce pip reinstall
+VERSION = (1, 3, 0, 'walker', 'e7df21a532')
 
 def get_version():
     version = '%s.%s' % (VERSION[0], VERSION[1])
