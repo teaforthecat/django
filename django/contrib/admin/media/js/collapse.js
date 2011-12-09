@@ -11,17 +11,15 @@
 			}
 		});
 		// Add toggle to anchor tag
-		$("fieldset.collapse a.collapse-toggle").toggle(
-			function() { // Show
+		$("fieldset.collapse a.collapse-toggle").click(function(){
+            if ($(this).closest("fieldset").hasClass("collapsed")){
 				$(this).text(gettext("Hide"));
 				$(this).closest("fieldset").removeClass("collapsed");
-				return false;
-			},
-			function() { // Hide
+            }else{
 				$(this).text(gettext("Show"));
 				$(this).closest("fieldset").addClass("collapsed");
-				return false;
-			}
-		);
+            }
+            return true;
+		});
 	});
 })(django.jQuery);
