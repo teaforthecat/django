@@ -14,8 +14,9 @@ function findForm(node) {
     return node;
 }
 
-var SelectFilter = {
-    init: function(field_id, field_name, is_stacked, admin_media_prefix) {
+var SelectFilter = function($){
+
+    var init = function(field_id, field_name, is_stacked, admin_media_prefix) {
         if (field_id.match(/__prefix__/)){
             // Don't intialize on empty forms.
             return;
@@ -105,8 +106,8 @@ var SelectFilter = {
 
         // Initial state refresh
         SelectFilter.refresh_state(field_id);
-    },
-    refresh_icons: function(field_id) {
+    };
+    var refresh_icons = function(field_id) {
         var from = $('#' + field_id + '_from');
         var to = $('#' + field_id + '_to');
         var is_from_selected = from.find('option:selected').length > 0;
@@ -117,8 +118,8 @@ var SelectFilter = {
         // Active if the corresponding box isn't empty
         $('#' + field_id + '_add_all_link').toggleClass('active', from.find('option').length > 0);
         $('#' + field_id + '_remove_all_link').toggleClass('active', to.find('option').length > 0);
-    },
-    refresh_state: function(field_id) {
+    };
+    var refresh_state = function(field_id) {
         SelectFilter.refresh_icons(field_id);
 
         // Re-generate the content of the actual, hidden, box.
@@ -141,9 +142,9 @@ var SelectFilter = {
             node = cache_from[i];
             actual_box.options[actual_box.options.length] = new Option(node.text, node.value, false, false);
         }
-    },
-    filter_key_up: function(event, field_id) {
-        from = document.getElementById(field_id + '_from');
+    };
+    var filter_key_up = function(event, field_id) {
+        var from = document.getElementById(field_id + '_from');
         // don't submit form if user pressed Enter
         if ((event.which && event.which == 13) || (event.keyCode && event.keyCode == 13)) {
             from.selectedIndex = 0;
@@ -155,9 +156,9 @@ var SelectFilter = {
         SelectBox.filter(field_id + '_from', document.getElementById(field_id + '_input').value);
         from.selectedIndex = temp;
         return true;
-    },
-    filter_key_down: function(event, field_id) {
-        from = document.getElementById(field_id + '_from');
+    };
+    var filter_key_down = function(event, field_id) {
+        var from = document.getElementById(field_id + '_from');
         // right arrow -- move across
         if ((event.which && event.which == 39) || (event.keyCode && event.keyCode == 39)) {
             var old_index = from.selectedIndex;
@@ -174,5 +175,12 @@ var SelectFilter = {
             from.selectedIndex = (from.selectedIndex == 0) ? from.length - 1 : from.selectedIndex - 1;
         }
         return true;
-    }
-}
+    };
+
+    return {'init': init,
+            'filter_key_down': filter_key_down,
+            'filter_key_up': filter_key_up,
+            'refresh_state': refresh_state,
+            'refresh_icons': refresh_icons
+           };
+}(django.jQuery);
