@@ -19,7 +19,7 @@
 				$(this).text(gettext("Show"));
 				$(this).closest("fieldset").addClass("collapsed");
             }
-            return true;
+            return false;
 		});
 	});
 })(django.jQuery);
