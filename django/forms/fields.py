@@ -2,6 +2,8 @@
 Field classes.
 """
 
+from __future__ import absolute_import
+
 import copy
 import datetime
 import os
@@ -13,21 +15,21 @@ try:
 except ImportError:
     from StringIO import StringIO
 
-from django.core.exceptions import ValidationError
 from django.core import validators
+from django.core.exceptions import ValidationError
+from django.forms.util import ErrorList
+from django.forms.widgets import (TextInput, PasswordInput, HiddenInput,
+    MultipleHiddenInput, ClearableFileInput, CheckboxInput, Select,
+    NullBooleanSelect, SelectMultiple, DateInput, DateTimeInput, TimeInput,
+    SplitDateTimeWidget, SplitHiddenDateTimeWidget, FILE_INPUT_CONTRADICTION)
 from django.utils import formats
-from django.utils.translation import ugettext_lazy as _
 from django.utils.encoding import smart_unicode, smart_str, force_unicode
 from django.utils.ipv6 import clean_ipv6_address
+from django.utils.translation import ugettext_lazy as _
 
 # Provide this import for backwards compatibility.
 from django.core.validators import EMPTY_VALUES
 
-from util import ErrorList
-from widgets import (TextInput, PasswordInput, HiddenInput,
-    MultipleHiddenInput, ClearableFileInput, CheckboxInput, Select,
-    NullBooleanSelect, SelectMultiple, DateInput, DateTimeInput, TimeInput,
-    SplitDateTimeWidget, SplitHiddenDateTimeWidget, FILE_INPUT_CONTRADICTION)
 
 __all__ = (
     'Field', 'CharField', 'IntegerField',
@@ -176,6 +178,7 @@ class Field(object):
         result = copy.copy(self)
         memo[id(self)] = result
         result.widget = copy.deepcopy(self.widget, memo)
+        result.validators = self.validators[:]
         return result
 
 class CharField(Field):
@@ -583,8 +586,22 @@ class URLField(CharField):
         self.validators.append(validators.URLValidator(verify_exists=verify_exists, validator_user_agent=validator_user_agent))
 
     def to_python(self, value):
+
+        def split_url(url):
+            """
+            Returns a list of url parts via ``urlparse.urlsplit`` (or raises a
+            ``ValidationError`` exception for certain).
+            """
+            try:
+                return list(urlparse.urlsplit(url))
+            except ValueError:
+                # urlparse.urlsplit can raise a ValueError with some
+                # misformatted URLs.
+                raise ValidationError(self.error_messages['invalid'])
+
+        value = super(URLField, self).to_python(value)
         if value:
-            url_fields = list(urlparse.urlsplit(value))
+            url_fields = split_url(value)
             if not url_fields[0]:
                 # If no URL scheme given, assume http://
                 url_fields[0] = 'http'
@@ -595,13 +612,12 @@ class URLField(CharField):
                 url_fields[2] = ''
                 # Rebuild the url_fields list, since the domain segment may now
                 # contain the path too.
-                value = urlparse.urlunsplit(url_fields)
-                url_fields = list(urlparse.urlsplit(value))
+                url_fields = split_url(urlparse.urlunsplit(url_fields))
             if not url_fields[2]:
                 # the path portion may need to be added before query params
                 url_fields[2] = '/'
             value = urlparse.urlunsplit(url_fields)
-        return super(URLField, self).to_python(value)
+        return value
 
 class BooleanField(Field):
     widget = CheckboxInput

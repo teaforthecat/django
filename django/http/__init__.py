@@ -1,3 +1,5 @@
+from __future__ import absolute_import
+
 import datetime
 import os
 import re
@@ -23,7 +25,7 @@ except ImportError:
 import Cookie
 # httponly support exists in Python 2.6's Cookie library,
 # but not in Python 2.5.
-_morsel_supports_httponly = Cookie.Morsel._reserved.has_key('httponly')
+_morsel_supports_httponly = 'httponly' in Cookie.Morsel._reserved
 # Some versions of Python 2.7 and later won't need this encoding bug fix:
 _cookie_encodes_correctly = Cookie.SimpleCookie().value_encode(';') == (';', '"\\073"')
 # See ticket #13007, http://bugs.python.org/issue2193 and http://trac.edgewall.org/ticket/2256
@@ -109,14 +111,14 @@ class CompatCookie(SimpleCookie):
         warnings.warn("CompatCookie is deprecated, use django.http.SimpleCookie instead.",
                       DeprecationWarning)
 
-from django.utils.datastructures import MultiValueDict, ImmutableList
-from django.utils.encoding import smart_str, iri_to_uri, force_unicode
-from django.utils.http import cookie_date
-from django.http.multipartparser import MultiPartParser
 from django.conf import settings
 from django.core import signing
 from django.core.files import uploadhandler
-from utils import *
+from django.http.multipartparser import MultiPartParser
+from django.http.utils import *
+from django.utils.datastructures import MultiValueDict, ImmutableList
+from django.utils.encoding import smart_str, iri_to_uri, force_unicode
+from django.utils.http import cookie_date
 
 RESERVED_CHARS="!*'();:@&=+$,/?%#[]"
 
@@ -194,10 +196,10 @@ class HttpRequest(object):
     def get_host(self):
         """Returns the HTTP host using the environment or request headers."""
         # We try three options, in order of decreasing preference.
-        # NS: patched per https://code.djangoproject.com/ticket/6880
-        #if 'HTTP_X_FORWARDED_HOST' in self.META:
-            #host = self.META['HTTP_X_FORWARDED_HOST']
-        if 'HTTP_HOST' in self.META:
+        if settings.USE_X_FORWARDED_HOST and (
+            'HTTP_X_FORWARDED_HOST' in self.META):
+            host = self.META['HTTP_X_FORWARDED_HOST']
+        elif 'HTTP_HOST' in self.META:
             host = self.META['HTTP_HOST']
         else:
             # Reconstruct the host using the algorithm from PEP 333.
@@ -283,7 +285,7 @@ class HttpRequest(object):
 
     def _get_upload_handlers(self):
         if not self._upload_handlers:
-            # If thre are no upload handlers defined, initialize them from settings.
+            # If there are no upload handlers defined, initialize them from settings.
             self._initialize_handlers()
         return self._upload_handlers
 
@@ -544,12 +546,7 @@ class HttpResponse(object):
         if not content_type:
             content_type = "%s; charset=%s" % (settings.DEFAULT_CONTENT_TYPE,
                     self._charset)
-        if not isinstance(content, basestring) and hasattr(content, '__iter__'):
-            self._container = content
-            self._is_string = False
-        else:
-            self._container = [content]
-            self._is_string = True
+        self.content = content
         self.cookies = SimpleCookie()
         if status:
             self.status_code = status
@@ -592,7 +589,7 @@ class HttpResponse(object):
 
     def has_header(self, header):
         """Case-insensitive check for a header."""
-        return self._headers.has_key(header.lower())
+        return header.lower() in self._headers
 
     __contains__ = has_header
 
@@ -649,12 +646,16 @@ class HttpResponse(object):
 
     def _get_content(self):
         if self.has_header('Content-Encoding'):
-            return ''.join(self._container)
-        return smart_str(''.join(self._container), self._charset)
+            return ''.join([str(e) for e in self._container])
+        return ''.join([smart_str(e, self._charset) for e in self._container])
 
     def _set_content(self, value):
-        self._container = [value]
-        self._is_string = True
+        if hasattr(value, '__iter__'):
+            self._container = value
+            self._base_content_is_iter = True
+        else:
+            self._container = [value]
+            self._base_content_is_iter = False
 
     content = property(_get_content, _set_content)
 
@@ -675,7 +676,7 @@ class HttpResponse(object):
     # The remaining methods partially implement the file-like object interface.
     # See http://docs.python.org/lib/bltin-file-objects.html
     def write(self, content):
-        if not self._is_string:
+        if self._base_content_is_iter:
             raise Exception("This %s instance is not writable" % self.__class__)
         self._container.append(content)
 
@@ -683,9 +684,9 @@ class HttpResponse(object):
         pass
 
     def tell(self):
-        if not self._is_string:
+        if self._base_content_is_iter:
             raise Exception("This %s instance cannot tell its position" % self.__class__)
-        return sum([len(chunk) for chunk in self._container])
+        return sum([len(str(chunk)) for chunk in self._container])
 
 class HttpResponseRedirect(HttpResponse):
     status_code = 302

@@ -78,6 +78,8 @@ class DatabaseFeatures(BaseDatabaseFeatures):
     supports_bitwise_or = False
     can_defer_constraint_checks = True
     ignores_nulls_in_unique_constraints = False
+    has_bulk_insert = True
+    supports_tablespaces = True
 
 class DatabaseOperations(BaseDatabaseOperations):
     compiler_module = "django.db.backends.oracle.compiler"
@@ -325,8 +327,10 @@ WHEN (new.%(col_name)s IS NULL)
         return ''
 
     def tablespace_sql(self, tablespace, inline=False):
-        return "%sTABLESPACE %s" % ((inline and "USING INDEX " or ""),
-            self.quote_name(tablespace))
+        if inline:
+            return "USING INDEX TABLESPACE %s" % self.quote_name(tablespace)
+        else:
+            return "TABLESPACE %s" % self.quote_name(tablespace)
 
     def value_to_db_datetime(self, value):
         # Oracle doesn't support tz-aware datetimes
@@ -371,6 +375,10 @@ WHEN (new.%(col_name)s IS NULL)
     def _get_trigger_name(self, table):
         name_length = self.max_name_length() - 3
         return '%s_TR' % util.truncate_name(table, name_length).upper()
+
+    def bulk_insert_sql(self, fields, num_values):
+        items_sql = "SELECT %s FROM DUAL" % ", ".join(["%s"] * len(fields))
+        return " UNION ALL ".join([items_sql] * num_values)
 
 
 class _UninitializedOperatorsDescriptor(object):

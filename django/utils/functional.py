@@ -1,3 +1,4 @@
+import copy
 import operator
 from functools import wraps, update_wrapper
 
@@ -27,6 +28,18 @@ def memoize(func, cache, num_args):
         cache[mem_args] = result
         return result
     return wrapper
+
+class cached_property(object):
+    """
+    Decorator that creates converts a method with a single
+    self argument into a property cached on the instance.
+    """
+    def __init__(self, func):
+        self.func = func
+
+    def __get__(self, instance, type):
+        res = instance.__dict__[self.func.__name__] = self.func(instance)
+        return res
 
 class Promise(object):
     """
@@ -246,7 +259,6 @@ class SimpleLazyObject(LazyObject):
             memo[id(self)] = result
             return result
         else:
-            import copy
             return copy.deepcopy(self._wrapped, memo)
 
     # Need to pretend to be the wrapped class, for the sake of objects that care
@@ -276,3 +288,16 @@ class lazy_property(property):
             def fdel(instance, name=fdel.__name__):
                 return getattr(instance, name)()
         return property(fget, fset, fdel, doc)
+
+def partition(predicate, values):
+    """
+    Splits the values into two sets, based on the return value of the function
+    (True/False). e.g.:
+
+        >>> partition(lambda: x > 3, range(5))
+        [1, 2, 3], [4]
+    """
+    results = ([], [])
+    for item in values:
+        results[predicate(item)].append(item)
+    return results

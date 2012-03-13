@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
-import os
 import errno
+import os
 import shutil
 import sys
 import tempfile
@@ -22,6 +22,7 @@ from django.core.files.base import ContentFile
 from django.core.files.images import get_image_dimensions
 from django.core.files.storage import FileSystemStorage, get_storage_class
 from django.core.files.uploadedfile import UploadedFile
+from django.test import SimpleTestCase
 from django.utils import unittest
 
 # Try to import PIL in either of the two ways it can end up installed.
@@ -36,14 +37,7 @@ except ImportError:
         Image = None
 
 
-class GetStorageClassTests(unittest.TestCase):
-    def assertRaisesErrorWithMessage(self, error, message, callable,
-        *args, **kwargs):
-        self.assertRaises(error, callable, *args, **kwargs)
-        try:
-            callable(*args, **kwargs)
-        except error, e:
-            self.assertEqual(message, str(e))
+class GetStorageClassTests(SimpleTestCase):
 
     def test_get_filesystem_storage(self):
         """
@@ -57,7 +51,7 @@ class GetStorageClassTests(unittest.TestCase):
         """
         get_storage_class raises an error if the requested import don't exist.
         """
-        self.assertRaisesErrorWithMessage(
+        self.assertRaisesMessage(
             ImproperlyConfigured,
             "NonExistingStorage isn't a storage module.",
             get_storage_class,
@@ -67,7 +61,7 @@ class GetStorageClassTests(unittest.TestCase):
         """
         get_storage_class raises an error if the requested class don't exist.
         """
-        self.assertRaisesErrorWithMessage(
+        self.assertRaisesMessage(
             ImproperlyConfigured,
             'Storage module "django.core.files.storage" does not define a '\
                 '"NonExistingStorage" class.',
@@ -101,6 +95,14 @@ class FileStorageTests(unittest.TestCase):
     def tearDown(self):
         shutil.rmtree(self.temp_dir)
         shutil.rmtree(self.temp_dir2)
+
+    def test_emtpy_location(self):
+        """
+        Makes sure an exception is raised if the location is empty
+        """
+        storage = self.storage_class(location='')
+        self.assertEqual(storage.base_location, '')
+        self.assertEqual(storage.location, os.getcwd())
 
     def test_file_access_options(self):
         """
@@ -236,26 +238,6 @@ class FileStorageTests(unittest.TestCase):
 
         self.storage.base_url = None
         self.assertRaises(ValueError, self.storage.url, 'test.file')
-
-    def test_file_with_mixin(self):
-        """
-        File storage can get a mixin to extend the functionality of the
-        returned file.
-        """
-        self.assertFalse(self.storage.exists('test.file'))
-
-        class TestFileMixin(object):
-            mixed_in = True
-
-        f = ContentFile('custom contents')
-        f_name = self.storage.save('test.file', f)
-
-        self.assertTrue(isinstance(
-            self.storage.open('test.file', mixin=TestFileMixin),
-            TestFileMixin
-        ))
-
-        self.storage.delete('test.file')
 
     def test_listdir(self):
         """

@@ -58,6 +58,8 @@ class DatabaseFeatures(BaseDatabaseFeatures):
     supports_unspecified_pk = True
     supports_1000_query_parameters = False
     supports_mixed_date_datetime_comparisons = False
+    has_bulk_insert = True
+    can_combine_inserts_with_and_without_auto_increment_pk = True
 
     def _supports_stddev(self):
         """Confirm support for STDDEV and related stats functions
@@ -106,7 +108,7 @@ class DatabaseOperations(BaseDatabaseOperations):
         return ""
 
     def pk_default_value(self):
-        return 'NULL'
+        return "NULL"
 
     def quote_name(self, name):
         if name.startswith('"') and name.endswith('"'):
@@ -153,6 +155,14 @@ class DatabaseOperations(BaseDatabaseOperations):
 
         # No field, or the field isn't known to be a decimal or integer
         return value
+
+    def bulk_insert_sql(self, fields, num_values):
+        res = []
+        res.append("SELECT %s" % ", ".join(
+            "%%s AS %s" % self.quote_name(f.column) for f in fields
+        ))
+        res.extend(["UNION SELECT %s" % ", ".join(["%s"] * len(fields))] * (num_values - 1))
+        return " ".join(res)
 
 class DatabaseWrapper(BaseDatabaseWrapper):
     vendor = 'sqlite'
@@ -208,7 +218,7 @@ class DatabaseWrapper(BaseDatabaseWrapper):
 
     def check_constraints(self, table_names=None):
         """
-        Checks each table name in table-names for rows with invalid foreign key references. This method is
+        Checks each table name in `table_names` for rows with invalid foreign key references. This method is
         intended to be used in conjunction with `disable_constraint_checking()` and `enable_constraint_checking()`, to
         determine if rows with invalid references were entered while constraint checks were off.
 
@@ -310,17 +320,11 @@ def _sqlite_format_dtdelta(dt, conn, days, secs, usecs):
             dt = dt - delta
     except (ValueError, TypeError):
         return None
-
-    if isinstance(dt, datetime.datetime):
-        rv = dt.strftime("%Y-%m-%d %H:%M:%S")
-        if dt.microsecond:
-            rv = "%s.%0.6d" % (rv, dt.microsecond)
-    else:
-        rv = dt.strftime("%Y-%m-%d")
-    return rv
+    # typecast_timestamp returns a date or a datetime without timezone.
+    # It will be formatted as "%Y-%m-%d" or "%Y-%m-%d %H:%M:%S[.%f]"
+    return str(dt)
 
 def _sqlite_regexp(re_pattern, re_string):
-    import re
     try:
         return bool(re.search(re_pattern, re_string))
     except:

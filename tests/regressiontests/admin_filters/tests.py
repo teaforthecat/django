@@ -1,19 +1,22 @@
+from __future__ import absolute_import
+
 import datetime
 
+from django.contrib.admin import (site, ModelAdmin, SimpleListFilter,
+    BooleanFieldListFilter)
+from django.contrib.admin.options import IncorrectLookupParameters
+from django.contrib.admin.views.main import ChangeList
+from django.contrib.auth.admin import UserAdmin
+from django.contrib.auth.models import User
 from django.core.exceptions import ImproperlyConfigured
 from django.test import TestCase, RequestFactory
 from django.utils.encoding import force_unicode
 
-from django.contrib.auth.admin import UserAdmin
-from django.contrib.auth.models import User
-from django.contrib.admin.views.main import ChangeList
-from django.contrib.admin import site, ModelAdmin, SimpleListFilter
+from .models import Book
 
-from models import Book
 
 def select_by(dictlist, key, value):
     return [x for x in dictlist if x[key] == value][0]
-
 
 class DecadeListFilter(SimpleListFilter):
 
@@ -49,6 +52,11 @@ class DecadeListFilterWithNoneReturningLookups(DecadeListFilterWithTitleAndParam
     def lookups(self, request, model_admin):
         pass
 
+class DecadeListFilterWithFailingQueryset(DecadeListFilterWithTitleAndParameter):
+
+    def queryset(self, request, queryset):
+        raise Exception
+
 class DecadeListFilterWithQuerysetBasedLookups(DecadeListFilterWithTitleAndParameter):
 
     def lookups(self, request, model_admin):
@@ -67,6 +75,9 @@ class BookAdmin(ModelAdmin):
     list_filter = ('year', 'author', 'contributors', 'is_best_seller', 'date_registered', 'no')
     ordering = ('-id',)
 
+class BookAdminWithTupleBooleanFilter(BookAdmin):
+    list_filter = ('year', 'author', 'contributors', ('is_best_seller', BooleanFieldListFilter), 'date_registered', 'no')
+
 class DecadeFilterBookAdmin(ModelAdmin):
     list_filter = ('author', DecadeListFilterWithTitleAndParameter)
     ordering = ('-id',)
@@ -79,6 +90,9 @@ class DecadeFilterBookAdminWithoutParameter(ModelAdmin):
 
 class DecadeFilterBookAdminWithNoneReturningLookups(ModelAdmin):
     list_filter = (DecadeListFilterWithNoneReturningLookups,)
+
+class DecadeFilterBookAdminWithFailingQueryset(ModelAdmin):
+    list_filter = (DecadeListFilterWithFailingQueryset,)
 
 class DecadeFilterBookAdminWithQuerysetBasedLookups(ModelAdmin):
     list_filter = (DecadeListFilterWithQuerysetBasedLookups,)
@@ -107,7 +121,7 @@ class ListFiltersTests(TestCase):
     def get_changelist(self, request, model, modeladmin):
         return ChangeList(request, model, modeladmin.list_display, modeladmin.list_display_links,
             modeladmin.list_filter, modeladmin.date_hierarchy, modeladmin.search_fields,
-            modeladmin.list_select_related, modeladmin.list_per_page, modeladmin.list_editable, modeladmin)
+            modeladmin.list_select_related, modeladmin.list_per_page, modeladmin.list_max_show_all, modeladmin.list_editable, modeladmin)
 
     def test_datefieldlistfilter(self):
         modeladmin = BookAdmin(Book, site)
@@ -174,8 +188,8 @@ class ListFiltersTests(TestCase):
         self.assertEqual(choice['query_string'], '?date_registered__year=%s'
                                                 % (self.today.year))
 
-        request = self.request_factory.get('/', {'date_registered__gte': self.one_week_ago.strftime('%Y-%m-%d'),
-                                                 'date_registered__lte': self.today.strftime('%Y-%m-%d')})
+        request = self.request_factory.get('/', {'date_registered__gte': str(self.one_week_ago),
+                                                 'date_registered__lte': str(self.today)})
         changelist = self.get_changelist(request, Book, modeladmin)
 
         # Make sure the correct queryset is returned
@@ -189,7 +203,7 @@ class ListFiltersTests(TestCase):
         self.assertEqual(choice['selected'], True)
         self.assertEqual(choice['query_string'], '?date_registered__gte=%s'
                                                  '&date_registered__lte=%s'
-                                                % (self.one_week_ago.strftime('%Y-%m-%d'), self.today.strftime('%Y-%m-%d')))
+                                                % (str(self.one_week_ago), str(self.today)))
 
     def test_allvaluesfieldlistfilter(self):
         modeladmin = BookAdmin(Book, site)
@@ -230,7 +244,7 @@ class ListFiltersTests(TestCase):
 
         # Make sure the last choice is None and is selected
         filterspec = changelist.get_filters(request)[0][1]
-        self.assertEqual(force_unicode(filterspec.title), u'author')
+        self.assertEquals(force_unicode(filterspec.title), u'Verbose Author')
         choices = list(filterspec.choices(changelist))
         self.assertEqual(choices[-1]['selected'], True)
         self.assertEqual(choices[-1]['query_string'], '?author__isnull=True')
@@ -240,7 +254,7 @@ class ListFiltersTests(TestCase):
 
         # Make sure the correct choice is selected
         filterspec = changelist.get_filters(request)[0][1]
-        self.assertEqual(force_unicode(filterspec.title), u'author')
+        self.assertEquals(force_unicode(filterspec.title), u'Verbose Author')
         # order of choices depends on User model, which has no order
         choice = select_by(filterspec.choices(changelist), "display", "alfred")
         self.assertEqual(choice['selected'], True)
@@ -258,7 +272,7 @@ class ListFiltersTests(TestCase):
 
         # Make sure the last choice is None and is selected
         filterspec = changelist.get_filters(request)[0][2]
-        self.assertEqual(force_unicode(filterspec.title), u'user')
+        self.assertEquals(force_unicode(filterspec.title), u'Verbose Contributors')
         choices = list(filterspec.choices(changelist))
         self.assertEqual(choices[-1]['selected'], True)
         self.assertEqual(choices[-1]['query_string'], '?contributors__isnull=True')
@@ -268,7 +282,7 @@ class ListFiltersTests(TestCase):
 
         # Make sure the correct choice is selected
         filterspec = changelist.get_filters(request)[0][2]
-        self.assertEqual(force_unicode(filterspec.title), u'user')
+        self.assertEquals(force_unicode(filterspec.title), u'Verbose Contributors')
         choice = select_by(filterspec.choices(changelist), "display", "bob")
         self.assertEqual(choice['selected'], True)
         self.assertEqual(choice['query_string'], '?contributors__id__exact=%d' % self.bob.pk)
@@ -331,7 +345,7 @@ class ListFiltersTests(TestCase):
         self.verify_booleanfieldlistfilter(modeladmin)
 
     def test_booleanfieldlistfilter_tuple(self):
-        modeladmin = BookAdmin(Book, site)
+        modeladmin = BookAdminWithTupleBooleanFilter(Book, site)
         self.verify_booleanfieldlistfilter(modeladmin)
 
     def verify_booleanfieldlistfilter(self, modeladmin):
@@ -469,7 +483,7 @@ class ListFiltersTests(TestCase):
         self.assertEqual(choices[3]['query_string'], '?publication-decade=the+00s&author__id__exact=%s' % self.alfred.pk)
 
         filterspec = changelist.get_filters(request)[0][0]
-        self.assertEqual(force_unicode(filterspec.title), u'author')
+        self.assertEquals(force_unicode(filterspec.title), u'Verbose Author')
         choice = select_by(filterspec.choices(changelist), "display", "alfred")
         self.assertEqual(choice['selected'], True)
         self.assertEqual(choice['query_string'], '?publication-decade=the+00s&author__id__exact=%s' % self.alfred.pk)
@@ -504,6 +518,17 @@ class ListFiltersTests(TestCase):
         changelist = self.get_changelist(request, Book, modeladmin)
         filterspec = changelist.get_filters(request)[0]
         self.assertEqual(len(filterspec), 0)
+
+    def test_filter_with_failing_queryset(self):
+        """
+        Ensure that a filter's failing queryset is interpreted as if incorrect
+        lookup parameters were passed (therefore causing a 302 redirection to
+        the changelist).
+        Refs #16716, #16714.
+        """
+        modeladmin = DecadeFilterBookAdminWithFailingQueryset(Book, site)
+        request = self.request_factory.get('/', {})
+        self.assertRaises(IncorrectLookupParameters, self.get_changelist, request, Book, modeladmin)
 
     def test_simplelistfilter_with_queryset_based_lookups(self):
         modeladmin = DecadeFilterBookAdminWithQuerysetBasedLookups(Book, site)

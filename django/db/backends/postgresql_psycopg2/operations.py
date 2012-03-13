@@ -99,6 +99,12 @@ class DatabaseOperations(BaseDatabaseOperations):
         else:
             return []
 
+    def tablespace_sql(self, tablespace, inline=False):
+        if inline:
+            return "USING INDEX TABLESPACE %s" % self.quote_name(tablespace)
+        else:
+            return "TABLESPACE %s" % self.quote_name(tablespace)
+
     def sequence_reset_sql(self, style, model_list):
         from django.db import models
         output = []
@@ -180,3 +186,7 @@ class DatabaseOperations(BaseDatabaseOperations):
 
     def return_insert_id(self):
         return "RETURNING %s", ()
+
+    def bulk_insert_sql(self, fields, num_values):
+        items_sql = "(%s)" % ", ".join(["%s"] * len(fields))
+        return "VALUES " + ", ".join([items_sql] * num_values)

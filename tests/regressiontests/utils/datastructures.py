@@ -4,22 +4,13 @@ Tests for stuff in django.utils.datastructures.
 
 import copy
 import pickle
-import unittest
 
-from django.utils.datastructures import *
-
-
-class DatastructuresTestCase(unittest.TestCase):
-    def assertRaisesErrorWithMessage(self, error, message, callable,
-        *args, **kwargs):
-        self.assertRaises(error, callable, *args, **kwargs)
-        try:
-            callable(*args, **kwargs)
-        except error, e:
-            self.assertEqual(message, str(e))
+from django.test import SimpleTestCase
+from django.utils.datastructures import (DictWrapper, DotExpandedDict,
+    ImmutableList, MultiValueDict, MultiValueDictKeyError, MergeDict, SortedDict)
 
 
-class SortedDictTests(DatastructuresTestCase):
+class SortedDictTests(SimpleTestCase):
     def setUp(self):
         self.d1 = SortedDict()
         self.d1[7] = 'seven'
@@ -125,7 +116,7 @@ class SortedDictTests(DatastructuresTestCase):
         self.assertEqual(self.d1, {})
         self.assertEqual(self.d1.keyOrder, [])
 
-class MergeDictTests(DatastructuresTestCase):
+class MergeDictTests(SimpleTestCase):
 
     def test_simple_mergedict(self):
         d1 = {'chris':'cool', 'camri':'cute', 'cotton':'adorable',
@@ -179,7 +170,7 @@ class MergeDictTests(DatastructuresTestCase):
                            ('key2', ['value2', 'value3']),
                            ('key4', ['value5', 'value6'])])
 
-class MultiValueDictTests(DatastructuresTestCase):
+class MultiValueDictTests(SimpleTestCase):
 
     def test_multivaluedict(self):
         d = MultiValueDict({'name': ['Adrian', 'Simon'],
@@ -198,7 +189,7 @@ class MultiValueDictTests(DatastructuresTestCase):
         # MultiValueDictKeyError: "Key 'lastname' not found in
         # <MultiValueDict: {'position': ['Developer'],
         #                   'name': ['Adrian', 'Simon']}>"
-        self.assertRaisesErrorWithMessage(MultiValueDictKeyError,
+        self.assertRaisesMessage(MultiValueDictKeyError,
             '"Key \'lastname\' not found in <MultiValueDict: {\'position\':'\
             ' [\'Developer\'], \'name\': [\'Adrian\', \'Simon\']}>"',
             d.__getitem__, 'lastname')
@@ -248,7 +239,7 @@ class MultiValueDictTests(DatastructuresTestCase):
         self.assertEqual({}, MultiValueDict().dict())
 
 
-class DotExpandedDictTests(DatastructuresTestCase):
+class DotExpandedDictTests(SimpleTestCase):
 
     def test_dotexpandeddict(self):
 
@@ -262,13 +253,13 @@ class DotExpandedDictTests(DatastructuresTestCase):
         self.assertEqual(d['person']['2']['firstname'], ['Adrian'])
 
 
-class ImmutableListTests(DatastructuresTestCase):
+class ImmutableListTests(SimpleTestCase):
 
     def test_sort(self):
         d = ImmutableList(range(10))
 
         # AttributeError: ImmutableList object is immutable.
-        self.assertRaisesErrorWithMessage(AttributeError,
+        self.assertRaisesMessage(AttributeError,
             'ImmutableList object is immutable.', d.sort)
 
         self.assertEqual(repr(d), '(0, 1, 2, 3, 4, 5, 6, 7, 8, 9)')
@@ -279,11 +270,11 @@ class ImmutableListTests(DatastructuresTestCase):
         self.assertEqual(d[1], 1)
 
         # AttributeError: Object is immutable!
-        self.assertRaisesErrorWithMessage(AttributeError,
+        self.assertRaisesMessage(AttributeError,
             'Object is immutable!', d.__setitem__, 1, 'test')
 
 
-class DictWrapperTests(DatastructuresTestCase):
+class DictWrapperTests(SimpleTestCase):
 
     def test_dictwrapper(self):
         f = lambda x: "*%s" % x

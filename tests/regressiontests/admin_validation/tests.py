@@ -1,11 +1,13 @@
+from __future__ import absolute_import
+
 from django import forms
+from django.contrib import admin
+from django.contrib.admin.validation import validate, validate_inline
 from django.core.exceptions import ImproperlyConfigured
 from django.test import TestCase
 
-from django.contrib import admin
-from django.contrib.admin.validation import validate, validate_inline
+from .models import Song, Book, Album, TwoAlbumFKAndAnE, State, City
 
-from models import Song, Book, Album, TwoAlbumFKAndAnE, State, City
 
 class SongForm(forms.ModelForm):
     pass
@@ -19,12 +21,6 @@ class InvalidFields(admin.ModelAdmin):
     fields = ['spam']
 
 class ValidationTestCase(TestCase):
-    def assertRaisesMessage(self, exc, msg, func, *args, **kwargs):
-        try:
-            func(*args, **kwargs)
-        except Exception, e:
-            self.assertEqual(msg, str(e))
-            self.assertTrue(isinstance(e, exc), "Expected %s, got %s" % (exc, type(e)))
 
     def test_readonly_and_editable(self):
         class SongAdmin(admin.ModelAdmin):

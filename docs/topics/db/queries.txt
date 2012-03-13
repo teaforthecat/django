@@ -113,6 +113,15 @@ method on the field to add a record to the relation. This example adds the
     >>> joe = Author.objects.create(name="Joe")
     >>> entry.authors.add(joe)
 
+To add multiple records to a ``ManyToManyField`` in one go, include multiple
+arguments in the call to ``add()``, like this::
+
+    >>> john = Author.objects.create(name="John")
+    >>> paul = Author.objects.create(name="Paul")
+    >>> george = Author.objects.create(name="George")
+    >>> ringo = Author.objects.create(name="Ringo")
+    >>> entry.authors.add(john, paul, george, ringo)
+
 Django will complain if you try to assign or add an object of the wrong type.
 
 Retrieving objects
@@ -175,13 +184,13 @@ complete set of objects.
 To create such a subset, you refine the initial ``QuerySet``, adding filter
 conditions. The two most common ways to refine a ``QuerySet`` are:
 
-    ``filter(**kwargs)``
-        Returns a new ``QuerySet`` containing objects that match the given
-        lookup parameters.
+``filter(**kwargs)``
+    Returns a new ``QuerySet`` containing objects that match the given
+    lookup parameters.
 
-    ``exclude(**kwargs)``
-        Returns a new ``QuerySet`` containing objects that do *not* match the
-        given lookup parameters.
+``exclude(**kwargs)``
+    Returns a new ``QuerySet`` containing objects that do *not* match the
+    given lookup parameters.
 
 The lookup parameters (``**kwargs`` in the above function definitions) should
 be in the format described in `Field lookups`_ below.
@@ -337,7 +346,7 @@ This is roughly equivalent to::
 
 Note, however, that the first of these will raise ``IndexError`` while the
 second will raise ``DoesNotExist`` if no objects match the given criteria. See
-:meth:`~django.db.models.QuerySet.get` for more details.
+:meth:`~django.db.models.query.QuerySet.get` for more details.
 
 .. _field-lookups-intro:
 
@@ -366,7 +375,6 @@ translates (roughly) into the following SQL::
    .. _`Keyword Arguments`: http://docs.python.org/tutorial/controlflow.html#keyword-arguments
 
 .. versionchanged:: 1.4
-
     The field specified in a lookup has to be the name of a model field.
     There's one exception though, in case of a
     :class:`~django.db.models.fields.ForeignKey` you can specify the field
@@ -382,56 +390,56 @@ The database API supports about two dozen lookup types; a complete reference
 can be found in the :ref:`field lookup reference <field-lookups>`. To give you a taste of what's available, here's some of the more common lookups
 you'll probably use:
 
-    :lookup:`exact`
-        An "exact" match. For example::
+:lookup:`exact`
+    An "exact" match. For example::
 
-            >>> Entry.objects.get(headline__exact="Man bites dog")
+        >>> Entry.objects.get(headline__exact="Man bites dog")
 
-        Would generate SQL along these lines:
+    Would generate SQL along these lines:
 
-        .. code-block:: sql
+    .. code-block:: sql
 
-            SELECT ... WHERE headline = 'Man bites dog';
+        SELECT ... WHERE headline = 'Man bites dog';
 
-        If you don't provide a lookup type -- that is, if your keyword argument
-        doesn't contain a double underscore -- the lookup type is assumed to be
-        ``exact``.
+    If you don't provide a lookup type -- that is, if your keyword argument
+    doesn't contain a double underscore -- the lookup type is assumed to be
+    ``exact``.
 
-        For example, the following two statements are equivalent::
+    For example, the following two statements are equivalent::
 
-            >>> Blog.objects.get(id__exact=14)  # Explicit form
-            >>> Blog.objects.get(id=14)         # __exact is implied
+        >>> Blog.objects.get(id__exact=14)  # Explicit form
+        >>> Blog.objects.get(id=14)         # __exact is implied
 
-        This is for convenience, because ``exact`` lookups are the common case.
+    This is for convenience, because ``exact`` lookups are the common case.
 
-    :lookup:`iexact`
-        A case-insensitive match. So, the query::
+:lookup:`iexact`
+    A case-insensitive match. So, the query::
 
-            >>> Blog.objects.get(name__iexact="beatles blog")
+        >>> Blog.objects.get(name__iexact="beatles blog")
 
-        Would match a ``Blog`` titled "Beatles Blog", "beatles blog", or even
-        "BeAtlES blOG".
+    Would match a ``Blog`` titled "Beatles Blog", "beatles blog", or even
+    "BeAtlES blOG".
 
-    :lookup:`contains`
-        Case-sensitive containment test. For example::
+:lookup:`contains`
+    Case-sensitive containment test. For example::
 
-            Entry.objects.get(headline__contains='Lennon')
+        Entry.objects.get(headline__contains='Lennon')
 
-        Roughly translates to this SQL:
+    Roughly translates to this SQL:
 
-        .. code-block:: sql
+    .. code-block:: sql
 
-            SELECT ... WHERE headline LIKE '%Lennon%';
+        SELECT ... WHERE headline LIKE '%Lennon%';
 
-        Note this will match the headline ``'Today Lennon honored'`` but not
-        ``'today lennon honored'``.
+    Note this will match the headline ``'Today Lennon honored'`` but not
+    ``'today lennon honored'``.
 
-        There's also a case-insensitive version, :lookup:`icontains`.
+    There's also a case-insensitive version, :lookup:`icontains`.
 
-    :lookup:`startswith`, :lookup:`endswith`
-        Starts-with and ends-with search, respectively. There are also
-        case-insensitive versions called :lookup:`istartswith` and
-        :lookup:`iendswith`.
+:lookup:`startswith`, :lookup:`endswith`
+    Starts-with and ends-with search, respectively. There are also
+    case-insensitive versions called :lookup:`istartswith` and
+    :lookup:`iendswith`.
 
 Again, this only scratches the surface. A complete reference can be found in the
 :ref:`field lookup reference <field-lookups>`.
@@ -1026,6 +1034,8 @@ existing elements.
 Each "reverse" operation described in this section has an immediate effect on
 the database. Every addition, creation and deletion is immediately and
 automatically saved to the database.
+
+.. _m2m-reverse-relationships:
 
 Many-to-many relationships
 --------------------------

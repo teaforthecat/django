@@ -1,3 +1,5 @@
+from __future__ import absolute_import
+
 from datetime import date
 
 from django import forms
@@ -15,13 +17,18 @@ from django.forms.widgets import Select
 from django.test import TestCase
 from django.utils import unittest
 
-from models import (Band, Concert, ValidationTestModel,
-    ValidationTestInlineModel)
+from .models import Band, Concert, ValidationTestModel, ValidationTestInlineModel
 
 
-# None of the following tests really depend on the content of the request,
-# so we'll just pass in None.
-request = None
+class MockRequest(object):
+    pass
+
+class MockSuperUser(object):
+    def has_perm(self, perm):
+        return True
+
+request = MockRequest()
+request.user = MockSuperUser()
 
 
 class ModelAdminTests(TestCase):
@@ -119,6 +126,99 @@ class ModelAdminTests(TestCase):
         ma = BandAdmin(Band, self.site)
         self.assertEqual(ma.get_form(request).base_fields.keys(),
             ['name'])
+
+    def test_custom_form_meta_exclude_with_readonly(self):
+        """
+        Ensure that the custom ModelForm's `Meta.exclude` is respected when
+        used in conjunction with `ModelAdmin.readonly_fields` and when no
+        `ModelAdmin.exclude` is defined.
+        Refs #14496.
+        """
+        # First, with `ModelAdmin` -----------------------
+
+        class AdminBandForm(forms.ModelForm):
+
+            class Meta:
+                model = Band
+                exclude = ['bio']
+
+        class BandAdmin(ModelAdmin):
+            readonly_fields = ['name']
+            form = AdminBandForm
+
+        ma = BandAdmin(Band, self.site)
+        self.assertEqual(ma.get_form(request).base_fields.keys(),
+            ['sign_date',])
+
+        # Then, with `InlineModelAdmin`  -----------------
+
+        class AdminConcertForm(forms.ModelForm):
+
+            class Meta:
+                model = Concert
+                exclude = ['day']
+
+        class ConcertInline(TabularInline):
+            readonly_fields = ['transport']
+            form = AdminConcertForm
+            fk_name = 'main_band'
+            model = Concert
+
+        class BandAdmin(ModelAdmin):
+            inlines = [
+                ConcertInline
+            ]
+
+        ma = BandAdmin(Band, self.site)
+        self.assertEqual(
+            list(ma.get_formsets(request))[0]().forms[0].fields.keys(),
+            ['main_band', 'opening_band', 'id', 'DELETE',])
+
+    def test_custom_form_meta_exclude(self):
+        """
+        Ensure that the custom ModelForm's `Meta.exclude` is overridden if
+        `ModelAdmin.exclude` or `InlineModelAdmin.exclude` are defined.
+        Refs #14496.
+        """
+        # First, with `ModelAdmin` -----------------------
+
+        class AdminBandForm(forms.ModelForm):
+
+            class Meta:
+                model = Band
+                exclude = ['bio']
+
+        class BandAdmin(ModelAdmin):
+            exclude = ['name']
+            form = AdminBandForm
+
+        ma = BandAdmin(Band, self.site)
+        self.assertEqual(ma.get_form(request).base_fields.keys(),
+            ['bio', 'sign_date',])
+
+        # Then, with `InlineModelAdmin`  -----------------
+
+        class AdminConcertForm(forms.ModelForm):
+
+            class Meta:
+                model = Concert
+                exclude = ['day']
+
+        class ConcertInline(TabularInline):
+            exclude = ['transport']
+            form = AdminConcertForm
+            fk_name = 'main_band'
+            model = Concert
+
+        class BandAdmin(ModelAdmin):
+            inlines = [
+                ConcertInline
+            ]
+
+        ma = BandAdmin(Band, self.site)
+        self.assertEqual(
+            list(ma.get_formsets(request))[0]().forms[0].fields.keys(),
+            ['main_band', 'opening_band', 'day', 'id', 'DELETE',])
 
     def test_custom_form_validation(self):
         # If we specify a form, it should use it allowing custom validation to work
@@ -264,9 +364,10 @@ class ModelAdminTests(TestCase):
 
         concert = Concert.objects.create(main_band=self.band, opening_band=self.band, day=1)
         ma = BandAdmin(Band, self.site)
-        fieldsets = list(ma.inline_instances[0].get_fieldsets(request))
+        inline_instances = ma.get_inline_instances(request)
+        fieldsets = list(inline_instances[0].get_fieldsets(request))
         self.assertEqual(fieldsets[0][1]['fields'], ['main_band', 'opening_band', 'day', 'transport'])
-        fieldsets = list(ma.inline_instances[0].get_fieldsets(request, ma.inline_instances[0].model))
+        fieldsets = list(inline_instances[0].get_fieldsets(request, inline_instances[0].model))
         self.assertEqual(fieldsets[0][1]['fields'], ['day'])
 
     # radio_fields behavior ###########################################
@@ -1019,6 +1120,24 @@ class ValidationTests(unittest.TestCase):
 
         class ValidationTestModelAdmin(ModelAdmin):
             list_per_page = 100
+
+        validate(ValidationTestModelAdmin, ValidationTestModel)
+
+    def test_max_show_all_allowed_validation(self):
+
+        class ValidationTestModelAdmin(ModelAdmin):
+            list_max_show_all = 'hello'
+
+        self.assertRaisesRegexp(
+            ImproperlyConfigured,
+            "'ValidationTestModelAdmin.list_max_show_all' should be an integer.",
+            validate,
+            ValidationTestModelAdmin,
+            ValidationTestModel,
+        )
+
+        class ValidationTestModelAdmin(ModelAdmin):
+            list_max_show_all = 200
 
         validate(ValidationTestModelAdmin, ValidationTestModel)
 
