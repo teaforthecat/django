@@ -280,12 +280,20 @@ class BaseForm(StrAndUnicode):
                 if isinstance(field, FileField):
                     initial = self.initial.get(name, field.initial)
                     value = field.clean(value, initial)
+                # Walker Custom: this elif enables the field to be required
+                # as well as overritten on the server side
+                # it is move here to avoid empty error messages on the form
+                # resulting in useless validation
+                elif hasattr(self, 'clean_%s' % name):
+                    value = getattr(self, 'clean_%s' % name)()
+                    self.cleaned_data[name] = value
                 else:
                     value = field.clean(value)
                 self.cleaned_data[name] = value
-                if hasattr(self, 'clean_%s' % name):
-                    value = getattr(self, 'clean_%s' % name)()
-                    self.cleaned_data[name] = value
+                # Walker Custom moved up to elif:
+                # if hasattr(self, 'clean_%s' % name):
+                #     value = getattr(self, 'clean_%s' % name)()
+                #     self.cleaned_data[name] = value
             except ValidationError, e:
                 self._errors[name] = self.error_class(e.messages)
                 if name in self.cleaned_data:
