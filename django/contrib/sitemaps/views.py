@@ -17,11 +17,11 @@ def index(request, sitemaps, extra_sites=[], template_name='sitemap_index.xml'):
             pages = site.paginator.num_pages
         sitemap_url = urlresolvers.reverse('django.contrib.sitemaps.views.sitemap', kwargs={'section': section})
         sites.append('%s://%s%s' % (protocol, current_site.domain, sitemap_url))
-        if extra_sites:
-            sites.append(*extra_sites)
         if pages > 1:
             for page in range(2, pages+1):
                 sites.append('%s://%s%s?p=%s' % (protocol, current_site.domain, sitemap_url, page))
+    if extra_sites:
+      sites.append(*extra_sites)
     xml = loader.render_to_string(template_name, {'sitemaps': sites})
     return HttpResponse(xml, mimetype='application/xml')
 
